@@ -1,0 +1,5 @@
+.env
+.DS_Store
+student_version.zip
+student_version/
+venv/
