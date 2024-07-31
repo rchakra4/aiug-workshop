@@ -108,6 +108,7 @@ with col1:
                 with st.chat_message("assistant"):
                     messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.internal_messages]
                     
+                    # call the chat model to generate a completion
                     completion = call_chat_model(client, messages)
                     
                     response = completion.choices[0].message.content
@@ -115,10 +116,12 @@ with col1:
                     print('***RAW OUTPUTS***')
                     print(response)
                     
+                    # add raw message to internal messages
                     st.session_state.internal_messages.append({"role": "assistant", "content": response})
 
                     message, nutrition_tracker, training_tracker = parse_messages(response)
 
+                    # add parsed message to external messages
                     st.session_state.external_messages.append({"role": "assistant", "content": message})
                     
                     # Update session state trackers
