@@ -47,7 +47,7 @@ def generate_events(data: Dict):
     time_frame = data["time_frame"]
     user_input = f"Find me {event_type} events in {location} around {time_frame} time frame in 2024. Return back specific events."
 
-    # Set memory for a specific user
+    # Set memory for a specific thread
     config = {"configurable": {"thread_id": "rc45"}}
 
     response = agent_executor.invoke({"messages": [("user", user_input)]}, config)
