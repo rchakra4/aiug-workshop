@@ -7,6 +7,21 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import create_react_agent
 
+from langchain.llms import HuggingFacePipeline
+from langchain.prompts import PromptTemplate
+from transformers import pipeline
+from langchain_core.output_parsers import StrOutputParser
+
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_core.runnables import RunnablePassthrough
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+import os
+
 import re
 from dotenv import load_dotenv
 
@@ -29,9 +44,6 @@ agent_executor = create_react_agent(model, tools, checkpointer=memory)
 ###########################
 
 # load docs
-from langchain_community.document_loaders import PyPDFLoader
-import os
-
 file_path = "../pdfs"
 docs = []
 for file in os.listdir(file_path):
@@ -41,23 +53,16 @@ for file in os.listdir(file_path):
         docs.extend(loader.load())
 
 # split and index
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
 splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=0)
 
 chunked_docs = splitter.split_documents(docs)
-
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
 
 db = FAISS.from_documents(chunked_docs, HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5"))
 
 retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 1})
 
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
-# model_name = "HuggingFaceH4/zephyr-7b-beta"
+# LLM model name
 model_name ="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
 save_directory = "../notebooks/model_directory"
@@ -79,12 +84,7 @@ else:
     model = AutoModelForCausalLM.from_pretrained(save_directory)
     tokenizer = AutoTokenizer.from_pretrained(save_directory)
 
-
-from langchain.llms import HuggingFacePipeline
-from langchain.prompts import PromptTemplate
-from transformers import pipeline
-from langchain_core.output_parsers import StrOutputParser
-
+# build LLM pipeline
 text_generation_pipeline = pipeline(
     model=model,
     tokenizer=tokenizer,
@@ -98,6 +98,7 @@ text_generation_pipeline = pipeline(
 
 llm = HuggingFacePipeline(pipeline=text_generation_pipeline)
 
+# RAG Prompt template
 prompt_template = """
 <|system|>
 Answer the question based on your knowledge. Use the following context to help:
@@ -112,14 +113,13 @@ Answer the question based on your knowledge. Use the following context to help:
 
  """
 
+# RAG chain
 prompt = PromptTemplate(
     input_variables=["context", "question"],
     template=prompt_template,
 )
 
 llm_chain = prompt | llm | StrOutputParser()
-
-from langchain_core.runnables import RunnablePassthrough
 
 rag_chain = {"context": retriever, "question": RunnablePassthrough()} | llm_chain
 
@@ -151,7 +151,6 @@ def generate_nutrition(data: Dict):
         
     return {"response": result}
 
-@app.post("/event")
 @app.post("/event")
 def generate_events(data: Dict):
     print(data)
